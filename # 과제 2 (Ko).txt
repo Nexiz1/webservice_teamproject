@@ -1,0 +1,407 @@
+# 과제 2 (Ko)
+
+# DB·API 설계를 기반으로 한 **실전 API 서버 구현**
+
+## 0) 과제 요약
+
+- **목표**:
+    - 과제 1에서 만든 **데이터베이스 스키마와 API 설계**를 실제로 구현하여, **JCloud에 배포**하고 **Swagger 문서와 Postman 테스트**로 검증
+    
+- **형식**:
+    - 개인 과제
+    
+- **기술 스택: 아래 어떤 기술 stack을 사용해도 괜찮습니다.**
+    - Spring Boot / FastAPI / Flask / Express.js (이 외의 framework를 사용하고자 하면, 미리 알려주세요)
+- **DB**: 어떤 database를 사용해도 괜찮으나, JCloud와 연동이 되어 있어야 함.
+    - Relational Database (RDB)
+    - NoSQL
+    
+- 배포: JCloud에 배포되어 정상적으로 접속이 가능해야 함.
+    - Port가 redirection이 되어있으니, 자세한 내용은 JCloud 문서를 참고하세요.
+
+- **산출물**:
+    - **Public GitHub Repo 주소**
+        - 모든 소스코드 포함
+        - 아래 내용을 포함하는 README.md
+            - 해당 project 및 코드에 대한 설명
+            - Swagger주소 + port (e.g., jcloud주소:포트번호)
+            - API root 주소
+            - 코드 설치 및 방법 (패키지 관리)
+                - e.g., npm install; npm run dev;
+                - e.g., pip install ~~~ or uv sync ~~~
+                - e.g., gradlew clean build; java -jar ~~~
+        - Postman 컬렉션
+    - **아래를 포함하는 텍스트 파일 또는 워드 파일**
+        - DB 아이디 및 비밀번호 & 접속 명령어
+        - 그 외 사용하고 있는 ID와 비밀번호 파일
+    - 본인 JCloud 접속을 위한 키 파일 (.ppk or .pem)
+    - **.env 파일**
+        - 반드시 github public repo에는 아래가 포함되어서는 안됨
+            - 서비스 사용을 위한 ID 및 비밀번호 일절
+            - JCloud 접속을 위한 key 파일
+            - 개인정보 및 접속과 관련된 민감한 파일
+            - * 본인 public repo에 민감한 정보가 올라가있을 시, 과제 0점 처리 함.
+        - 민감한 정보는 .env 파일에 저장하도록 하며, .env 파일은 Classroom을 통해 제출
+    
+- **최소 요건(핵심)**:
+    - **엔드포인트 30개 이상**(상세 기준 하단)
+    - **Swagger 문서 자동화** + **Postman 컬렉션(JSON)** 제출
+    - **JWT 인증/인가**(최소 2개 Role (e.g., 일반 유저, 관리자 등)
+    - **페이지네이션/검색/정렬** 구현
+    - **에러 처리 & 입력 검증** 일관성
+    - **실서버 배포(JCloud)** 및 **헬스체크 OK**
+    
+- 예시 및 참고 페이지:
+    - http://113.198.66.75:10251/swagger-ui/index.html
+    - https://github.com/EZRANDO/bookstore-backend(https://github.com/EZRANDO/bookstore-backend)
+    
+
+---
+
+## 1) 기능 범위와 제약사항(필수)
+
+### 1-1. 리소스(도메인) 구성
+
+- **최소 4개 이상의 핵심 리소스**를 정의하고 구현할 것
+예시) `users`, `auth`, `posts`, `comments`, `categories`, `likes`, `tags`, `orders`, `products` 등
+- 각 리소스는 **CRUD 전부**(Create/Read/Update/Delete) 제공(예외: `auth`는 인증/인가 전용)
+
+### 1-2. 엔드포인트 수(필수)
+
+- **총 30개 이상의 HTTP 엔드포인트** 구현
+    - 기본 CRUD: 4개 × 4리소스 = 16개
+    - 추가 고급 기능(아래 예시) 합산하여 **30개 이상** 확보
+        - 예: `/posts?keyword=…&sort=…&page=…&size=…` (검색/정렬/페이지네이션)
+        - 예: `/posts/{id}/comments` (관계형 sub-resource)
+        - 예: `/users/{id}/profile`, `/users/{id}/deactivate`, `/posts/{id}/like`
+        - 예: `/stats/daily`, `/stats/top-authors` (집계/통계)
+        - 예: `/auth/login`, `/auth/refresh`, `/auth/logout`
+        - 예: `/files/upload` (선택)
+    - **동일 URL이더라도 기능이 명확히 다르면 1개로 인정**
+    (예: `GET /posts`와 `GET /posts?keyword=abc`는 하나로 본다 → 쿼리옵션은 기능 증빙으로 활용하되, 개수 산정은 URL·메서드 기준)
+
+### 1-3. 인증/인가(필수)
+
+- **JWT 기반 인증**
+    - `POST /auth/login` → Access Token 발급
+    - `POST /auth/refresh` → 토큰 재발급
+    - **만료·위조 토큰 처리** 필수
+- **Role 기반 인가(RBAC)** 최소 2개 Role
+    - 예: `ROLE_USER`, `ROLE_ADMIN`
+    - 관리자 전용 엔드포인트(예: 사용자 정지, 통계 조회 등) **최소 3개 이상**
+
+### 1-4. 요청 검증 & 에러 응답 규격(필수)
+
+- **입력 검증**: DTO/Schema로 필드 타입·범위·필수값 검사
+- **에러 응답 통일** (예시)
+    
+    ```json
+    {
+      "timestamp": "2025-03-05T12:00:00Z",
+      "path": "/posts/123",
+      "status": 400,
+      "code": "POST_INVALID_TITLE",
+      "message": "title length must be 1~100",
+      "details": { "title": "too long" }
+    }
+    
+    ```
+    
+- **대표 에러코드** 최소 10종 정의(400/401/403/404/409/422/429/500 등)
+
+### 1-5. 목록 조회 공통 규격(필수)
+
+- **페이지네이션**: `page`, `size` (기본값/최대값 명시)
+- **정렬**: `sort=field,DESC|ASC` 형식
+- **검색/필터**: 최소 2개 이상 조건 지원(예: `keyword`, `category`, `dateFrom/dateTo`)
+- 응답 페이로드 예시
+    
+    ```json
+    {
+      "content": [ ... ],
+      "page": 0,
+      "size": 20,
+      "totalElements": 153,
+      "totalPages": 8,
+      "sort": "createdAt,DESC"
+    }
+    
+    ```
+    
+
+### 1-6. 데이터베이스(필수)
+
+- **MySQL 사용**, **외래키(FK)**, **인덱스**(검색/조인 대상 필드) 설계
+- **마이그레이션 도구** 사용 권장: Flyway/Liquibase/Prisma/SQLAlchemy Alembic 등
+- **시드 데이터**: **최소 200건 이상**(여러 테이블에 분산) - 통계/검색 검증 가능 수준
+- **N+1 방지**(ORM 사용 시 Eager/Lazy 전략 명시)
+
+### 1-7. 보안·성능(필수)
+
+- **환경변수(.env) 사용**, 비밀키/DB비밀번호는 레포에 커밋 금지
+    - 대신 **`.env.example` 필수 제공**
+- **비밀번호 해시**(bcrypt, Argon2 등)
+- **CORS 설정**(테스트용 허용 도메인 명시)
+- **기본 레이트리밋**(전역 혹은 인증 없는 엔드포인트에 최소치 적용) 또는 **요청 크기 제한**
+- **헬스체크**: `GET /health`는 인증 없이 200 반환 + 버전, 빌드시간 등 포함
+
+### 1-8. 문서화(필수)
+
+- **Swagger/OpenAPI** 자동 문서
+    - 예: `/swagger-ui` 또는 `/docs`로 접근 가능
+    - 각 엔드포인트별 **요청/응답 스키마와 예시** 제공
+    - **401/403/404/422/500** 예시 응답도 문서화
+- **Postman 컬렉션(JSON)** 제출
+    - 환경 변수 사용(서버 URL, 토큰)
+    - **Pre-request/Test 스크립트** 포함(토큰 저장·주입, 응답검증 등 최소 5개)
+
+### 1-9. 로깅 & 예외 추적(필수)
+
+- 요청/응답 요약 로그(메서드, 경로, 상태코드, 지연시간)
+- 에러 발생 시 스택트레이스 서버 로그 남기기(민감정보 제외)
+
+### 1-10. 테스트(필수)
+
+- **자동화 테스트 20개 이상**
+    - 단위/통합 혼합 가능
+    - 인증 필요한 엔드포인트 포함
+- **성공/실패 케이스 모두** 포함
+
+---
+
+## 2) 배포(JCloud) 요구사항
+
+1. **JCloud 인스턴스 생성 → 애플리케이션 구동**
+2. **도메인/포트**: 접근 가능한 퍼블릭 엔드포인트 제공
+    - 예: `http://<ip>:<port>` 또는 바인딩된 도메인
+3. **헬스체크 OK**(200 반환) 스크린샷 제출
+4. **서버 재시작 후에도 지속 구동**
+    - PM2(systemd)·Supervisor 등 프로세스 매니저 사용 권장
+
+---
+
+## 3) GitHub 제출물(필수 포함 파일)
+
+```
+repo-root
+├─ README.md
+├─ .gitignore
+├─ .env.example
+├─ docs/
+│  ├─ api-design.md          # 과제1의 API 설계 반영/수정사항 요약
+│  ├─ db-schema.png|sql|md   # ERD 혹은 스키마 정의
+│  └─ architecture.md        # 계층/의존성/모듈 구조 개요
+├─ postman/
+│  └─ <project>.postman_collection.json
+├─ src/ ...                  # 애플리케이션 소스
+├─ scripts/ ...              # 초기 스키마/시드/배포 스크립트(선택)
+└─ tests/ ...                # 자동화 테스트 (선택)
+
+```
+
+### [README.md](http://readme.md/) 필수 섹션(템플릿)
+
+- 프로젝트 개요(문제정의, 주요 기능 목록)
+- **실행 방법**
+    - 로컬 실행: 의존성 설치, 마이그레이션/시드, 서버 실행 커맨드
+    - 예시
+        
+        ```bash
+        # Node
+        npm install
+        npm run migrate && npm run seed
+        npm run start
+        
+        # Python (FastAPI)
+        pip install -r requirements.txt
+        alembic upgrade head && python seed.py
+        uvicorn app.main:app --host 0.0.0.0 --port 8080
+        
+        ```
+        
+- **환경변수 설명** (`.env.example`와 매칭)
+- **배포 주소**
+    - Base URL, Swagger URL, Health URL
+- **인증 플로우 설명**
+- **역할/권한표**(ROLE_USER/ROLE_ADMIN가 접근 가능한 API 표)
+- **예제 계정**
+    - `user1@example.com / P@ssw0rd!`
+    - `admin@example.com / P@ssw0rd!` (권한·주의사항 명시)
+- **DB 연결 정보(테스트용)**
+    - 호스트/포트/DB명/계정(권한 범위 명시)
+- **엔드포인트 요약표**(URL·메서드·설명)
+- **성능/보안 고려사항**(레이트리밋, 인덱스 등)
+- **한계와 개선 계획**
+
+---
+
+## 4) 표준 에러 코드 정의
+
+API 서버는 모든 오류 상황에 대해 **일관된 JSON 형식의 응답**을 반환해야 합니다.
+
+---
+
+### 4-1. 에러 응답 공통 포맷
+
+```json
+{
+  "timestamp": "2025-03-05T12:34:56Z",
+  "path": "/api/posts/1",
+  "status": 400,
+  "code": "POST_TITLE_TOO_LONG",
+  "message": "게시글 제목은 1~100자 이내여야 합니다.",
+  "details": {
+    "title": "현재 길이 150자"
+  }
+}
+
+```
+
+| 필드명 | 설명 |
+| --- | --- |
+| `timestamp` | 에러 발생 시각 (ISO 8601) |
+| `path` | 요청 경로 |
+| `status` | HTTP 상태 코드 |
+| `code` | 시스템 내부 에러 코드 (대문자+언더스코어 표기) |
+| `message` | 사용자에게 전달할 짧은 에러 메시지 |
+| `details` | (선택) 필드별 오류나 내부 상세 사유 |
+
+---
+
+### 4-2. 표준 에러 코드 정의 (최소 10종 이상이 포함 되어야 함.)
+
+| HTTP 코드 | 에러 코드 | 설명 |
+| --- | --- | --- |
+| **400** | `BAD_REQUEST` | 요청 형식이 올바르지 않음 |
+| 400 | `VALIDATION_FAILED` | 필드 유효성 검사 실패 |
+| 400 | `INVALID_QUERY_PARAM` | 쿼리 파라미터 값이 잘못됨 |
+| **401** | `UNAUTHORIZED` | 인증 토큰 없음 또는 잘못된 토큰 |
+| 401 | `TOKEN_EXPIRED` | 토큰 만료 |
+| **403** | `FORBIDDEN` | 접근 권한 없음 (Role 불일치 등) |
+| **404** | `RESOURCE_NOT_FOUND` | 요청한 리소스가 존재하지 않음 |
+| 404 | `USER_NOT_FOUND` | 사용자 ID가 존재하지 않음 |
+| **409** | `DUPLICATE_RESOURCE` | 중복 데이터 존재(이메일 중복 등) |
+| 409 | `STATE_CONFLICT` | 리소스 상태 충돌(이미 삭제된 항목 등) |
+| **422** | `UNPROCESSABLE_ENTITY` | 처리할 수 없는 요청 내용(형식은 맞지만 논리적 오류) |
+| **429** | `TOO_MANY_REQUESTS` | 요청 한도 초과 (rate limiting) |
+| **500** | `INTERNAL_SERVER_ERROR` | 서버 내부 오류 |
+| 500 | `DATABASE_ERROR` | DB 연동 오류 |
+| 500 | `UNKNOWN_ERROR` | 알 수 없는 오류 (최종 fallback) |
+
+---
+
+### 4-3. 에러 처리 규칙
+
+1. **모든 예외는 위 표의 코드 중 하나로 매핑**해야 함.
+(단, 세부 프로젝트 사양에 맞춰 코드 추가 가능)
+2. **Swagger 문서의 각 엔드포인트**에 최소 다음 응답 예시를 포함:
+    - 400, 401, 403, 404, 422, 500
+3. Postman 테스트 시, 각 대표 에러케이스를 실제로 검증하는 요청 3개 이상 포함.
+4. Validation 실패 시 필드별 오류를 `details` 객체로 포함.
+
+---
+
+## 5) 평가 기준(100점)
+
+| 항목 | 세부 기준 | 배점 |
+| --- | --- | --- |
+| 기능 충족 | 4+ 리소스, **30+ 엔드포인트**, CRUD 완성도 | **20** |
+| DB | DB 설계 및 제약사항 | **15** |
+| 인증/인가 | JWT, 만료/재발급, RBAC(관리자 전용 2+) | **15** |
+| API 품질 | 페이지네이션/검색/정렬, 입력검증, 에러규격 | **15** |
+| 문서화 | Swagger 완성도, 예시/스키마, Postman 스크립트 | **10** |
+| 배포 안정성 | JCloud 가용성, 헬스체크, 재시작 지속성 | **10** |
+| 테스트 | 자동화 테스트 20+, 성공/실패/권한 포함 | **10** |
+| 코드/README | 구조, 주석, 실행가이드, .env 관리 | **5** |
+
+### 감점/실격 규정
+
+- **배포 서버 미작동**(수업 시간/제출 시점에 접속 불가) **20점**
+- **Swagger 미제공** 또는 문서와 실제 동작 불일치 **10점**
+- **엔드포인트 30개 미만** **10점**
+- **JWT/RBAC 미구현** **15점**
+- **표절/무단 복제**: **실격(0점)** 및 학사규정에 따라 처리
+
+---
+
+## 6) 마감 및 제출 방식
+
+1. **Classroom 제출 항목**
+    - **Public GitHub Repo 주소**
+        - 모든 소스코드 포함
+        - 아래 내용을 포함하는 README.md
+            - 해당 project 및 코드에 대한 설명
+            - Swagger주소 + port (e.g., jcloud주소:포트번호)
+            - API root 주소
+            - 코드 설치 및 방법 (패키지 관리)
+                - e.g., npm install; npm run dev;
+                - e.g., pip install ~~~ or uv sync ~~~
+                - e.g., gradlew clean build; java -jar ~~~
+        - Postman 컬렉션
+    - **아래를 포함하는 텍스트 파일 또는 워드 파일**
+        - DB 아이디 및 비밀번호 & 접속 명령어
+        - 그 외 사용하고 있는 ID와 비밀번호 파일
+    - 본인 JCloud 접속을 위한 키 파일 (.ppk or .pem)
+    - **.env 파일**
+        - 반드시 github public repo에는 아래가 포함되어서는 안됨
+            - 서비스 사용을 위한 ID 및 비밀번호 일절
+            - JCloud 접속을 위한 key 파일
+            - 개인정보 및 접속과 관련된 민감한 파일
+            - * 본인 public repo에 민감한 정보가 올라가있을 시, 과제 0점 처리 함.
+        - 민감한 정보는 .env 파일에 저장하도록 하며, .env 파일은 Classroom을 통해 제출
+2. **마감 시각**: **12월 14일 23시 59분 (이후 매 12시간 늦을 때마다, 5점씩 감소)**
+
+---
+
+## 7) 권장 구현 순서
+
+- [ ]  과제1 산출물(ERD, API 설계) 최종 확정
+- [ ]  스캐폴딩(프로젝트 생성) / 의존성 설치
+- [ ]  DB 마이그레이션 · 시드 스크립트 작성
+- [ ]  기본 CRUD → 관계형(sub-resource) → 검색/정렬/페이지네이션
+- [ ]  JWT 인증/인가(RBAC) → 관리자용 API
+- [ ]  에러 응답 규격화 · 입력 검증 추가
+- [ ]  Swagger 문서화(예시/스키마/에러 포함)
+- [ ]  Postman 컬렉션(+테스트 스크립트)
+- [ ]  로깅/헬스체크/레이트리밋
+- [ ]  자동화 테스트(20+)
+- [ ]  JCloud 배포(프로세스 매니저 설정)
+- [ ]  README 정리 · 최종 점검
+
+---
+
+## 8) 예시 엔드포인트 설계(참고)
+
+### 인증/사용자
+
+- `POST /auth/login`
+- `POST /auth/refresh`
+- `POST /auth/logout`
+- `POST /users` (회원가입)
+- `GET /users/me` (자기 정보)
+- `PATCH /users/me`
+- `GET /users` (ADMIN)
+- `PATCH /users/{id}/deactivate` (ADMIN)
+
+### 게시글/댓글
+
+- `POST /posts` / `GET /posts` / `GET /posts/{id}` / `PATCH /posts/{id}` / `DELETE /posts/{id}`
+- `GET /posts?keyword=&category=&sort=&page=&size=`
+- `GET /posts/{id}/comments` / `POST /posts/{id}/comments`
+- `POST /posts/{id}/like` / `DELETE /posts/{id}/like`
+
+### 통계
+
+- `GET /stats/daily`
+- `GET /stats/top-authors`
+
+※ 위 예시는 개수 채우기 용이하도록 구성했으며, **본인 주제**에 맞게 변경 가능.
+
+---
+
+## 9) 보너스(+최대 10점)
+
+- **CI 구성(GitHub Actions)**: 테스트·Lint·빌드 자동화(+4)
+- **도커라이징**: `docker-compose up`으로 DB+앱 일괄 실행(+3)
+- **캐싱**(예: 인기글, 카테고리 목록)(+2)
+- **모니터링 지표**(요청 수, 평균 지연, 에러율)(+1)
