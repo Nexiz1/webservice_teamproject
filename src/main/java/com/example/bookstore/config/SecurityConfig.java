@@ -65,6 +65,7 @@ public class SecurityConfig {
                 )
                 // OAuth2 로그인 설정 (중요!)
                 .oauth2Login(oauth2 -> oauth2
+                        .loginPage("/login.html")
                         .userInfoEndpoint(userInfo -> userInfo
                                 .userService(customOAuth2UserService)
                         )
