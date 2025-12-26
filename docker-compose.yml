@@ -36,8 +36,7 @@ services:
       - "6379:6379"
 
   backend:
-    #image: ghcr.io/nexiz1/webservice_teamproject:latest
-    build: ./
+    image: ghcr.io/nexiz1/webservice_teamproject:latest
     restart: unless-stopped
     env_file:
       - .env

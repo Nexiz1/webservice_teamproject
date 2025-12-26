@@ -5,7 +5,7 @@
 ## 프로젝트 개요
 
 ### 주요 기능
-- **회원 관리**: 회원가입, 로그인, 회원 정보 수정
+- **회원 관리**: 회원가입, 로그인(일반/소셜), 회원 정보 수정
 - **도서 관리**: 도서 등록/수정/삭제, 도서 검색, 평점 조회
 - **장바구니**: 장바구니 추가/수정/삭제/조회
 - **주문 관리**: 주문 생성, 주문 조회, 주문 상태 변경
@@ -16,9 +16,11 @@
 - **Framework**: Spring Boot 3.2.0
 - **Language**: Java 17
 - **Database**: MySQL 8.0
-- **Authentication**: JWT (JSON Web Token)
-- **Documentation**: Swagger/OpenAPI 3.0
+- **Authentication**: JWT (JSON Web Token), OAuth2 (Google), Firebase
 - **Build Tool**: Gradle 8.5
+- **Infrastructure**: Docker, Docker Compose
+- **CI/CD**: GitHub Actions
+- **Documentation**: Swagger/OpenAPI 3.0
 
 ---
 
@@ -26,9 +28,9 @@
 
 | 항목 | URL                                          |
 |------|----------------------------------------------|
-| **Base URL** | `http://113.198.66.75:10168/api`            |
-| **Swagger UI** | `http://113.198.66.75:10168/swagger-ui.html` |
-| **Health Check** | `http://113.198.66.75:10168/health`       |
+| **Base URL** | `http://113.198.66.75:10097/api`            |
+| **Swagger UI** | `http://113.198.66.75:10097/swagger-ui.html` |
+| **Health Check** | `http://113.198.66.75:10097/health`       |
 
 ---
 
@@ -39,18 +41,59 @@
 `.env.example`을 참고하여 `.env` 파일을 생성합니다.
 ```bash
 # Database Configuration
+DB_NAME=bookstore
 DB_URL=jdbc:mysql://localhost:3306/bookstore?useSSL=false&serverTimezone=Asia/Seoul&allowPublicKeyRetrieval=true
+# docker compose 사용 시
+#DB_URL=jdbc:mysql://db:3306/bookstore?useSSL=false&serverTimezone=Asia/Seoul&allowPublicKeyRetrieval=true
 DB_USERNAME=your_username
 DB_PASSWORD=your_password
+DB_ROOT_PASSWORD=your_root_password
 DB_DRIVER=com.mysql.cj.jdbc.Driver
 HIBERNATE_DIALECT=org.hibernate.dialect.MySQLDialect
+
+# Redis Configuration
+REDIS_HOST=bookstoreCache
+REDIS_PORT=6379
+REDIS_PASSWORD=your_password
 
 # JWT Configuration
 JWT_SECRET=your_jwt_secret_key_must_be_at_least_256_bits_long_for_security
 
 # Server Configuration
 SERVER_PORT=8080
+
+# Google OAuth2
+GOOGLE_CLIENT_ID=your_oauth_client_id
+GOOGLE_CLIENT_SECRET=your_oauth_client_secret
+
+# OAuth2 Configuration
+spring.security.oauth2.client.registration.google.client-id=your_oauth_client_id
+spring.security.oauth2.client.registration.google.client-secret=your_oauth_secret
+FIREBASE_SERVICE_ACCOUNT={"type": "service_account","project_id":...}
 ```
+
+### Docker Compose로 실행 (권장)
+   MySQL, Redis, API 서버를 컨테이너로 한 번에 실행합니다. 별도의 DB 설치가 필요 없습니다.
+
+```bash
+# backend의 이미지를 직접 빌드하고 싶을 시 docker compose파일의 backend의 image 구문 삭제 및 build 구문 추가
+# ghcr.io/nexiz1/webservice_teamproject:latest에서 이미지를 pull해와서 실행
+docker compose pull
+# 컨테이너 빌드 및 백그라운드 실행
+docker compose up -d --
+
+# 로그 확인 (실시간)
+docker compose logs -f
+```
+
+실행 확인:
+
+컨테이너가 정상적으로 실행되면 다음 주소로 접근할 수 있습니다.
+
+Swagger UI: http://localhost:8080/swagger-ui.html
+
+Health Check: http://localhost:8080/health
+
 
 ### 로컬 실행
 ```bash
@@ -122,6 +165,9 @@ mysql -h 113.198.66.75 -P 3306 -u {username} -p bookstore
 2. API 요청 시 헤더에 `Authorization: Bearer {access_token}`을 포함합니다.
 3. Access Token 만료 시 `/api/auth/refresh`로 새 토큰을 발급받습니다.
 
+### Oauth 기반 로그인
+- Firebase(Github) & OAuth2(Google) /login.html로 접근하여 Oauth소셜 로그인 수행
+
 ### 토큰 유효시간
 - Access Token: 1시간
 - Refresh Token: 7일
@@ -145,15 +191,16 @@ mysql -h 113.198.66.75 -P 3306 -u {username} -p bookstore
 
 ---
 
-## API 엔드포인트 요약 (37개)
+## API 엔드포인트 요약 (38개)
 
-### 인증 (Auth) - 4개
-| Method | Endpoint | 설명 | 권한 |
-|--------|----------|------|------|
-| POST | /api/users | 회원가입 | Public |
-| POST | /api/auth/login | 로그인 | Public |
-| POST | /api/auth/refresh | 토큰 재발급 | Public |
-| POST | /api/auth/logout | 로그아웃 | User |
+### 인증 (Auth) - 5개
+| Method | Endpoint | 설명                | 권한 |
+|--------|----------|-------------------|------|
+| POST | /api/users | 회원가입              | Public |
+| POST | /api/auth/login | 로그인               | Public |
+| POST | /api/auth/refresh | 토큰 재발급            | Public |
+| POST | /api/auth/logout | 로그아웃              | User |
+| POST | /api/auth/firebase | Firebase Oauth로그인 | User |
 
 ### 사용자 (User) - 6개
 | Method | Endpoint                       | 설명 | 권한 |
@@ -379,8 +426,7 @@ bookstore/
 - [ ] 이미지 업로드 (S3 연동)
 - [ ] 결제 시스템 연동
 - [ ] 실시간 알림 (WebSocket)
-- [ ] Docker 컨테이너화
-- [ ] CI/CD 파이프라인 구축
+
 
 ---
 
@@ -395,9 +441,9 @@ bookstore/
 - **Dockerizing**: `docker-compose.yml`을 통해 MySQL, Redis, App을 원클릭으로 실행할 수 있습니다.
 - **GHCR 배포**: GitHub Actions를 통해 `release` 브랜치 푸시 시 도커 이미지가 GHCR에 자동으로 빌드 및 업로드됩니다.
 - **CI 파이프라인**: 모든 PR 및 푸시 시 Gradle 테스트가 자동으로 수행되어 코드 안정성을 보장합니다.
-
+- **CD 파이프라인**: Release 브랜치에 push할 시 github actions에서 서버에 ssh접속하여 docker compose pull & docker compose up을 수행합니다.
 - Redis Integration: 세션 관리 및 성능 최적화를 위한 Redis 도입.
-- 
+
 
 ## 라이선스
 
