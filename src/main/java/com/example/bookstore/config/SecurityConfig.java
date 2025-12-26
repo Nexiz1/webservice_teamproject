@@ -59,6 +59,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/reviews/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/books/*/reviews").permitAll()
                         .requestMatchers("/oauth2/**", "/login/oauth2/**", "/oauth/success").permitAll()
+                        .requestMatchers("/login.html").permitAll()
                         // All other endpoints require authentication
                         .anyRequest().authenticated()
                 )

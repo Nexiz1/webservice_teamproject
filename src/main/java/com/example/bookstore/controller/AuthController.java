@@ -53,4 +53,12 @@ public class AuthController {
         authService.logout(user);
         return ResponseEntity.ok().build();
     }
+
+    // 5. POST /api/auth/firebase - Firebase 로그인
+    @Operation(summary = "Firebase 로그인", description = "Firebase ID Token을 사용하여 로그인합니다")
+    @PostMapping("/auth/firebase")
+    public ResponseEntity<ApiResponse<LoginResponse>> firebaseLogin(@Valid @RequestBody FirebaseLoginRequest request) {
+        LoginResponse response = authService.firebaseLogin(request);
+        return ResponseEntity.ok(ApiResponse.success("Firebase 로그인 성공", response));
+    }
 }

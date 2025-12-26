@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>GitHub 로그인</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+<main class="d-flex flex-column align-items-center mt-5">
+    <div class="w-25">
+        <h1 class="fw-bold mb-4 text-center">로그인(firebase)</h1>
+
+        <div class="d-grid gap-2">
+            <a href="/oauth2/authorization/google" class="btn btn-outline-danger">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-google me-2" viewBox="0 0 16 16">
+                    <path d="M15.545 6.558a9.42 9.42 0 0 1 .139 1.626c0 2.434-.87 4.492-2.384 5.885h.002C11.978 15.292 10.158 16 8 16A8 8 0 1 1 8 0a7.689 7.689 0 0 1 5.352-2.082l-2.284 2.284A4.347 4.347 0 0 0 8 3.166c-2.087 0-3.86 1.408-4.492 3.304a4.792 4.792 0 0 0 0 3.063h.003c.635 1.893 2.405 3.301 4.492 3.301 1.078 0 2.004-.276 2.722-.764h-.003a3.702 3.702 0 0 0 1.599-2.431H8v-3.08h7.545z"/>
+                </svg>
+                Google로 로그인
+            </a>
+            <button id="githubLoginBtn" class="btn btn-dark">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                     class="bi bi-github me-2" viewBox="0 0 16 16">
+                    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+                </svg>
+                GitHub로 로그인
+            </button>
+        </div>
+    </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script type="module">
+    import {initializeApp} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    // GithubAuthProvider 추가
+    import {
+        getAuth,
+        signInWithPopup,
+        GithubAuthProvider
+    } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyACik8PSi9kerbpR7ZzSiCWEQVQWQTuG98",
+        authDomain: "bookstore-2f2d7.firebaseapp.com",
+        projectId: "bookstore-2f2d7",
+        storageBucket: "bookstore-2f2d7.firebasestorage.app",
+        messagingSenderId: "15359892546",
+        appId: "1:15359892546:web:bafcd56f82aa0c581b21db"
+    };
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    // 제공업체를 GitHub로 설정
+    const provider = new GithubAuthProvider();
+
+    document.getElementById('githubLoginBtn').addEventListener('click', async () => {
+        try {
+            // 1. GitHub 팝업 로그인 요청
+            const result = await signInWithPopup(auth, provider);
+
+            // GitHub 계정 정보 (필요시 사용)
+            const user = result.user;
+            console.log("GitHub User:", user);
+
+            // 2. Firebase ID Token 획득
+            const idToken = await user.getIdToken();
+
+            // 3. 백엔드로 토큰 전송 (기존과 동일)
+            const response = await fetch('/api/auth/firebase', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({idToken: idToken})
+            });
+
+            // 4. 응답 처리
+            if (response.ok) {
+                const data = await response.json();
+                const loginResponse = data.payload;
+
+                localStorage.setItem('accessToken', loginResponse.accessToken);
+                localStorage.setItem('refreshToken', loginResponse.refreshToken);
+
+                // [수정 포인트] 화면의 내용을 지우고 토큰 정보를 예쁘게 띄워줍니다.
+                const mainContainer = document.querySelector('main');
+                mainContainer.innerHTML = `
+                    <div class="container mt-3 w-75">
+                        <div class="alert alert-success">
+                            <h4 class="alert-heading">✅ GitHub 로그인 성공!</h4>
+                            <p>서버로부터 토큰을 성공적으로 받아왔습니다.</p>
+                            <hr>
+                            <div class="mb-3">
+                                <label class="fw-bold">Access Token</label>
+                                <textarea class="form-control" rows="4" readonly>${loginResponse.accessToken}</textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="fw-bold">Refresh Token</label>
+                                <textarea class="form-control" rows="3" readonly>${loginResponse.refreshToken}</textarea>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                alert('GitHub 로그인 성공!');
+            } else {
+                const errorData = await response.json();
+                alert('로그인 실패: ' + (errorData.message || '서버 오류'));
+            }
+
+        } catch (error) {
+            console.error('Login Error:', error);
+            // 이메일 중복 에러 처리 (같은 이메일로 다른 공급업체 가입된 경우)
+            if (error.code === 'auth/account-exists-with-different-credential') {
+                alert("이미 다른 방식으로 가입된 이메일입니다. 해당 방식으로 로그인해주세요.");
+            } else {
+                alert("로그인 중 오류 발생: " + error.message);
+            }
+        }
+    });
+</script>
+
+</body>
+</html>
