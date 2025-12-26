@@ -27,7 +27,7 @@ public class User implements UserDetails {
     @Column(nullable = false, unique = true)
     private String email;
 
-    @Column(nullable = false)
+    @Column // OAuth 사용자는 비밀번호 없을 수 있으므로 nullable = true
     private String password;
 
     @Column(nullable = false)
@@ -46,6 +46,13 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private Role role;
 
+    // OAuth 관련 필드 추가
+    @Column(name = "provider")
+    private String provider; // "google", "local" 등
+
+    @Column(name = "provider_id")
+    private String providerId; // Google의 sub 값
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -54,6 +61,7 @@ public class User implements UserDetails {
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
     }
 
     @PreUpdate
@@ -69,6 +77,11 @@ public class User implements UserDetails {
     @Override
     public String getUsername() {
         return email;
+    }
+
+    @Override
+    public String getPassword() {
+        return password; // OAuth 사용자는 null일 수 있음
     }
 
     @Override
