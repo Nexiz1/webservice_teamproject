@@ -375,13 +375,13 @@ bookstore/
 ├── src/
 │   ├── main/
 │   │   ├── java/com/example/bookstore/
-│   │   │   ├── config/          # 설정 (Security, Swagger, RateLimit)
+│   │   │   ├── config/          # 설정 (Security, Swagger, RateLimit, Firebase)
 │   │   │   ├── controller/      # REST 컨트롤러
 │   │   │   ├── dto/             # 요청/응답 DTO
 │   │   │   ├── entity/          # JPA 엔티티
 │   │   │   ├── exception/       # 예외 처리
 │   │   │   ├── repository/      # JPA 리포지토리
-│   │   │   ├── security/        # JWT 관련
+│   │   │   ├── security/        # JWT, OAuth2 관련
 │   │   │   └── service/         # 비즈니스 로직
 │   │   └── resources/
 │   │       └── application.properties
@@ -394,6 +394,8 @@ bookstore/
 ├── api-spec.md                  # API 명세서
 ├── .env.example                 # 환경변수 템플릿
 ├── build.gradle                 # Gradle 빌드 설정
+├── docker-compose.yml           # Docker Compose 설정
+├── Dockerfile                   # Docker 이미지 빌드 설정
 └── README.md
 ```
 

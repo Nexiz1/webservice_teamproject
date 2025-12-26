@@ -10,14 +10,16 @@
 
 | 구분 | 기술 |
 |------|------|
-| Framework | Spring Boot 3.2.0 |
-| Language | Java 17 |
-| Database | MySQL 8.0 |
-| ORM | Spring Data JPA (Hibernate) |
-| Authentication | JWT (Access Token + Refresh Token) |
-| Documentation | Swagger/OpenAPI 3.0 |
-| Build Tool | Gradle 8.5 |
-| Test | JUnit 5, Spring MockMvc |
+| **Framework** | Spring Boot 3.2.0 |
+| **Language** | Java 17 |
+| **Database** | MySQL 8.0, **Redis 8.4** (Cache/Session) |
+| **ORM** | Spring Data JPA (Hibernate) |
+| **Authentication** | JWT, OAuth2 (Google), Firebase |
+| **Infrastructure** | Docker, Docker Compose |
+| **CI/CD** | GitHub Actions, GHCR |
+| **Documentation** | Swagger/OpenAPI 3.0 |
+| **Build Tool** | Gradle 8.5 |
+| **Test** | JUnit 5, Spring MockMvc |
 
 ---
 
@@ -73,6 +75,7 @@ com.example.bookstore/
 │   ├── SecurityConfig.java         # Spring Security 설정
 │   ├── SwaggerConfig.java          # Swagger/OpenAPI 설정
 │   ├── RateLimitFilter.java        # Rate Limiting 필터
+│   ├── FirebaseConfig.java         # Firebase 설정 (New)
 │   └── DataInitializer.java        # 시드 데이터 초기화
 │
 ├── controller/                     # REST 컨트롤러
@@ -90,6 +93,7 @@ com.example.bookstore/
 │
 ├── service/                        # 비즈니스 로직
 │   ├── AuthService.java            # 인증 서비스
+│   ├── CustomOAuth2UserService.java# OAuth2 사용자 서비스 (New)
 │   ├── UserService.java            # 사용자 서비스
 │   ├── BookService.java            # 도서 서비스
 │   ├── CartService.java            # 장바구니 서비스
@@ -134,6 +138,7 @@ com.example.bookstore/
 ├── security/                       # 보안 관련
 │   ├── JwtTokenProvider.java       # JWT 토큰 생성/검증
 │   ├── JwtAuthenticationFilter.java # JWT 인증 필터
+│   ├── CustomOAuth2User.java       # OAuth2 사용자 정보 (New)
 │   └── CustomUserDetailsService.java # 사용자 인증 서비스
 │
 └── exception/                      # 예외 처리
@@ -189,6 +194,18 @@ Controller → Service → Repository → Database
        ▼
    Controller (@AuthenticationPrincipal User user)
 ```
+
+1. 일반 로그인 (JWT)
+   Client: POST /api/auth/login 요청.
+   - Server: ID/PW 검증 후 JwtTokenProvider를 통해 Access Token 및 Refresh Token 발급.
+   - Client: 이후 요청 헤더에 Authorization: Bearer {token} 포함.
+
+
+2. 소셜 로그인 (OAuth2 - Google) Client: /oauth2/authorization/google 로 접근하여 구글 로그인 페이지 리다이렉트.
+   - Provider: 인증 후 Authorization Code와 함께 서버로 리다이렉트.
+
+   - Server: CustomOAuth2UserService: 사용자 정보 로드 및 DB 저장/갱신.
+   - OAuth2SuccessHandler: 인증 성공 후 JWT 생성하여 클라이언트로 리다이렉트 (Query Parameter 등으로 토큰 전달).
 
 ### 권한 체계
 
@@ -271,21 +288,37 @@ Exception
 
 ## 배포 구성
 
-### JCloud 배포
+### JCloud 배포 (Docker Compose)
+- docker Compose를 통해 App, DB, Cache가 격리된 네트워크 환경에서 구동됩니다.
+```mermaid
+graph LR
+    subgraph "Docker Host (AWS/JCloud)"
+        
+        subgraph "Docker Network (bookstore_net)"
+            Backend["Backend Container<br/>(Spring Boot:8080)"]
+            DB["MySQL Container<br/>(Port:3306)"]
+            Redis["Redis Container<br/>(Port:6379)"]
+        end
+        
+    end
 
+    User[User] -->|Port 8080| Backend
+    Backend -->|Internal 3306| DB
+    Backend -->|Internal 6379| Redis
 ```
-┌─────────────────┐     ┌─────────────────┐
-│   JCloud VM     │     │    MySQL DB     │
-│                 │     │                 │
-│  Spring Boot    │────▶│   bookstore     │
-│  (Port: 8080)   │     │   (Port: 3306)  │
-└─────────────────┘     └─────────────────┘
-         │
-         │ (Port Redirect: 10168 → 8080)
-         ▼
-    Public Access
-    http://113.198.66.75:10168
-```
+
+### CI/CD 파이프라인 (GitHub Actions)
+1. Code Push: 개발자가 GitHub에 코드 푸시.
+
+2. CI (Test): gradle test 자동 실행.
+
+3. CD (Build & Push):
+
+    - release 브랜치 병합 시 Docker Image 빌드.
+
+    - GHCR(GitHub Container Registry)에 이미지 업로드.
+
+4. Deploy: 서버에서 docker-compose pull 및 up으로 최신 버전 배포.
 
 ### 프로세스 관리
 - nohup 또는 systemd 서비스로 백그라운드 실행
