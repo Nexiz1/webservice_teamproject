@@ -38,7 +38,7 @@ jobs:
       - name: Run Tests
         run: ./gradlew test
 
-  deploy:
+  build-and-push:
     needs: test
     if: github.ref == 'refs/heads/release' && github.event_name == 'push'
     runs-on: ubuntu-latest
@@ -62,3 +62,22 @@ jobs:
           context: .
           push: true
           tags: ghcr.io/nexiz1/webservice_teamproject:latest
+
+  deploy:
+    needs: build-and-push  # 빌드가 끝난 뒤에 실행됨
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to Server via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.KEY }}
+          port: ${{ secrets.PORT }}
+          script: |
+            cd ~/webservice_teamproject
+        
+            docker compose pull
+            docker compose up -d --remove-orphans
+            
+            docker image prune -f

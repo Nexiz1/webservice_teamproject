@@ -1,6 +1,7 @@
 services:
   db:
     image: mysql:8.0
+    restart: unless-stopped
     environment:
       MYSQL_USER: ${DB_USERNAME}
       MYSQL_PASSWORD: ${DB_PASSWORD}
@@ -22,6 +23,7 @@ services:
 
   redis:
     image: redis:8.4.0
+    restart: unless-stopped
     command: redis-server --requirepass ${REDIS_PASSWORD}
 
     healthcheck:
@@ -36,6 +38,7 @@ services:
   backend:
     #image: ghcr.io/nexiz1/webservice_teamproject:latest
     build: ./
+    restart: unless-stopped
     env_file:
       - .env
     depends_on:
