@@ -1,6 +1,8 @@
 package com.example.bookstore.config;
 
+import com.example.bookstore.security.CustomOAuth2UserService;
 import com.example.bookstore.security.JwtAuthenticationFilter;
+import com.example.bookstore.security.OAuth2SuccessHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -30,6 +32,8 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final CustomOAuth2UserService customOAuth2UserService;
+    private final OAuth2SuccessHandler oAuth2SuccessHandler;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -54,8 +58,16 @@ public class SecurityConfig {
                         // Review single - public
                         .requestMatchers(HttpMethod.GET, "/api/reviews/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/books/*/reviews").permitAll()
+                        .requestMatchers("/oauth2/**", "/login/oauth2/**", "/oauth/success").permitAll()
                         // All other endpoints require authentication
                         .anyRequest().authenticated()
+                )
+                // OAuth2 로그인 설정 (중요!)
+                .oauth2Login(oauth2 -> oauth2
+                        .userInfoEndpoint(userInfo -> userInfo
+                                .userService(customOAuth2UserService)
+                        )
+                        .successHandler(oAuth2SuccessHandler)
                 )
                 .headers(headers -> headers.frameOptions(frame -> frame.disable()))
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
